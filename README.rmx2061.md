@@ -9,7 +9,7 @@ DTBs are build checks only and must not be flashed to RMX2061.
 - Android Common Kernel: <https://android.googlesource.com/kernel/common>
 - Starting tag: `android16-6.12-2026-09_r14` (Linux 6.12.92)
 - Starting commit: `1c2e69ab43af9f6078be91c53b2c6043390e39a6`
-- Port branch: `rmx2061-cnb-6.12`
+- Development and default branch: `main`
 
 Keep the base tag unchanged, original SPDX/copyright notices, and original
 patch authors, dates and sign-off chains. Import upstream changes as
