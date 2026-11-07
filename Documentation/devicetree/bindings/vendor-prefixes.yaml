@@ -1106,6 +1106,8 @@ patternProperties:
     description: OpenRISC.io
   "^openwrt,.*":
     description: OpenWrt
+  "^oppo,.*":
+    description: OPPO
   "^option,.*":
     description: Option NV
   "^oranth,.*":
@@ -1228,6 +1230,8 @@ patternProperties:
     description: Raydium Semiconductor Corp.
   "^rda,.*":
     description: Unisoc Communications, Inc.
+  "^realme,.*":
+    description: realme
   "^realtek,.*":
     description: Realtek Semiconductor Corp.
   "^remarkable,.*":

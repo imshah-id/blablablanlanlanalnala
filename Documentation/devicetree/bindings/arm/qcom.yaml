@@ -980,6 +980,7 @@ properties:
 
       - items:
           - enum:
+              - realme,rmx2061
               - xiaomi,curtana
               - xiaomi,joyeuse
           - const: qcom,sm7125
@@ -1066,6 +1067,12 @@ properties:
           - const: qcom,x1e80100
 
   # Board compatibles go above
+
+  oppo,dtsi_no:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Legacy project selector used by the Realme RMX2061 bootloader to select
+      the board device tree. Project 19721 identifies the Realme 6 Pro.
 
   qcom,msm-id:
     $ref: /schemas/types.yaml#/definitions/uint32-matrix
