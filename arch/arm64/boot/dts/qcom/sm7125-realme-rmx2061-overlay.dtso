@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/arm/qcom,ids.h>
+
+/ {
+	compatible = "realme,rmx2061", "qcom,sm7125";
+	qcom,msm-id = <QCOM_ID_SM7125 0>;
+	qcom,board-id = <34 0>;
+	oppo,dtsi_no = <19721>;
+
+	/* Hardware is described in the board DTB; retain the DTBO selector. */
+	fragment@0 {
+		target-path = "/";
+
+		__overlay__ {
+			model = "Realme 6 Pro (RMX2061)";
+		};
+	};
+};

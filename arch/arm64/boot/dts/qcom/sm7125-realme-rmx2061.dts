@@ -105,9 +105,20 @@
 			no-map;
 		};
 
-		/* Reserve the vendor log area until its custom layout is ported. */
-		pstore_mem: memory@b7e00000 {
-			reg = <0x0 0xb7e00000 0x0 0x400000>;
+		/* Keep the vendor dump slots reserved around its console buffer. */
+		memory@b7e00000 {
+			reg = <0x0 0xb7e00000 0x0 0x17eff8>;
+		};
+
+		/* Match the 4.14 console address for log recovery after rollback. */
+		ramoops@b7f7eff8 {
+			compatible = "ramoops";
+			reg = <0x0 0xb7f7eff8 0x0 0x40000>;
+			console-size = <0x40000>;
+		};
+
+		memory@b7fbeff8 {
+			reg = <0x0 0xb7fbeff8 0x0 0x241008>;
 		};
 	};
 };
