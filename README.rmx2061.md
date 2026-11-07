@@ -1,136 +1,184 @@
-# Realme 6 Pro / RMX2061 — Android 6.12 port
+# Realme 6 Pro (RMX2061) — Linux 6.12
 
-Experimental source work for Evolution X CNB. The initial RMX2061 board
-DTS covers identification, fixed reserved memory and the debug UART. It
-has not been boot-tested; there is no bootable RMX2061 image yet. The
-existing Xiaomi reference DTBs must not be flashed to RMX2061.
+Device support for RMX2061 / Qualcomm SM7125 (Atoll-AB), based on Android
+Common Kernel 6.12. Intended for custom ROM development; integration is not
+tied to a particular ROM project.
 
-## Source and authorship
+**Status: source bring-up.** Board descriptions and selected driver paths
+build, but this kernel has not booted on RMX2061. There is no validated boot
+image, flashable package or hardware-support release.
 
-- Android Common Kernel: <https://android.googlesource.com/kernel/common>
-- Starting tag: `android16-6.12-2026-09_r14` (Linux 6.12.92)
-- Starting commit: `1c2e69ab43af9f6078be91c53b2c6043390e39a6`
-- Development and default branch: `main`
+## Port status
 
-Keep the base tag unchanged, original SPDX/copyright notices, and original
-patch authors, dates and sign-off chains. Import upstream changes as
-separate commits with their source commit IDs. Describe any backport
-adjustments explicitly. Keep new device work separate from imported work;
-do not attribute copied drivers to the porter or invent review/sign-off
-trailers. A submitter must personally certify their own DCO sign-off before
-external submission; using a configured Git committer identity is not that
-certification. See `Documentation/process/submitting-patches.rst`.
+Updated: 2026-11-07. “Implemented” means source/configuration is present.
+Build checks do not establish that a component works on the phone.
 
-The initial checkout is shallow. Earlier history remains available from
-the original repositories; the source has not been reinitialized as a new
-project. Referenced donor commits are fetched before import.
+| Component | Implemented | Verification | Remaining work |
+| --- | --- | --- | --- |
+| Android kernel base | Pinned ACK 6.12.92; SM7125 TrustZone SHM-bridge fix | Targeted compilation and allocator regression checks | Matching production toolchain and full Image build |
+| Board identification | RMX2061 DTS; SoC 443, board 34/0, project 19721 | Compared with live DT/selected DTBO; compiled-DTB checks | Bootloader acceptance and DTB/DTBO packaging |
+| Reserved memory | Fixed firmware carveouts; overlapping vendor ranges normalized | Complete fixed/no-map coverage and non-overlap checks | Command DB location and dynamic pools |
+| Debug console | UART8 at 0xa88000; GPIO44/45 | DT compilation, bindings and pinctrl assertions | Physical UART output |
+| PMICs and regulators | PM6150/PM6150L descriptions; six UFS/USB rails | Supply/voltage checks, bindings and driver compilation | Physical rail operation; remaining peripheral supplies |
+| PMIC temperature monitoring | Upstream thermal trips; built-in temperature/ADC drivers | Configuration and driver compilation | Physical thermal/suspend testing |
+| UFS storage | Controller/PHY supplies; TLMM119 reset | DT/schema checks; host, core and PHY compilation | Device enumeration, I/O and power transitions |
+| USB device mode | USB2-only DWC3/QUSB2; vendor PHY tuning; configfs/FunctionFS | DT/schema checks and driver compilation | Enumeration, gadget functions and suspend/resume |
+| Inline storage crypto | UFS crypto and Qualcomm ICE selected in bring-up config | Configuration and driver compilation | Firmware/key compatibility and encrypted-data access |
+| Display and touch | No board drivers enabled | JDI NT36672C panel selection captured as reference | Panel, backlight and touch bring-up |
+| GPU | Disabled | Disabled-state checks | Driver/userspace interface decision and bring-up |
+| Modem, DSP and connectivity | Board remote processors disabled | Disabled-state checks | Firmware mapping, modem, Wi-Fi, Bluetooth and audio |
+| Camera, sensors and fingerprint | Not ported | None | Driver and userspace integration |
+| Battery and charging | Not ported | None | Fuel gauge, charger, Type-C/OTG, protections and fast charging |
+| ROM integration | Not implemented | No userspace boot test | Init, fstab, modules, VINTF, SELinux and vendor interfaces |
 
-| Imported prerequisite | Original author | Original commit |
+No boot, storage I/O, USB enumeration, graphics, camera, radio, encrypted-data,
+suspend, thermal or charging acceptance test has passed on this kernel.
+
+## Source baseline
+
+| Item | Revision |
+| --- | --- |
+| Upstream | [Android Common Kernel](https://android.googlesource.com/kernel/common) |
+| Starting tag | `android16-6.12-2026-09_r14` |
+| Starting commit | `1c2e69ab43af9f6078be91c53b2c6043390e39a6` |
+| Kernel version | `6.12.92` |
+| Development branch | `main` |
+| Board source | `arch/arm64/boot/dts/qcom/sm7125-realme-rmx2061.dts` |
+| Bring-up fragment | `arch/arm64/configs/rmx2061.config` |
+
+The original upstream history and pinned tag are preserved. Existing Xiaomi
+SM7125 DTBs are reference build targets and are unsuitable for RMX2061.
+
+## Build and validation
+
+Use Linux with LLVM/LLD, GNU make, GCC host tools, flex, bison, bc, OpenSSL
+and ELF development headers. Keep output on a Linux filesystem outside the
+source checkout.
+
+The checks below used Linux ARM64 with Ubuntu Clang/LLD 18.1.3. They are
+bootstrap checks. The pinned ACK release specifies Clang `r536225` and Rust
+`1.82.0.p2` in `build.config.constants`; a full build with those matching
+dependencies remains pending. This fragment supplements ARM64 `defconfig`;
+it is not a complete ROM configuration or certified GKI configuration.
+
+Configure a separate output:
+
+```sh
+make O=/path/to/out ARCH=arm64 LLVM=1 defconfig rmx2061.config
+```
+
+Compile the board and the driver paths checked during this milestone:
+
+```sh
+make O=/path/to/out ARCH=arm64 LLVM=1 -j4 \
+    drivers/regulator/qcom-rpmh-regulator.o drivers/ufs/core/ \
+    drivers/ufs/host/ufs-qcom.o drivers/ufs/host/ufshcd-pltfrm.o \
+    drivers/soc/qcom/ice.o drivers/phy/qualcomm/phy-qcom-qmp-ufs.o \
+    drivers/phy/qualcomm/phy-qcom-qusb2.o drivers/usb/dwc3/ \
+    drivers/usb/gadget/configfs.o drivers/usb/gadget/function/f_fs.o \
+    drivers/iio/adc/qcom-spmi-adc5.o drivers/iio/adc/qcom-vadc-common.o \
+    drivers/thermal/qcom/qcom-spmi-temp-alarm.o \
+    qcom/sm7125-realme-rmx2061.dtb
+```
+
+The fragment builds the early storage/PHY and configfs gadget paths into the
+kernel, including the QMP parent dependency. PMIC temperature/ADC and
+inline-crypto dependencies are also built in. Required symbols are checked
+after Kconfig resolution, rather than inferred from the fragment text.
+
+Validation covers the compiled selectors, reservation unions, UART/reset
+pins, supply phandles, voltage limits, USB2-only PHY list, tuning, eFuse cell
+and disabled subsystems. Targeted schema checks cover the new board, PMIC,
+regulator, UFS and USB nodes. This is not a full-tree schema pass. During
+initial schema preprocessing, the unchanged ACK bindings
+`firmware/gunyah-cma-mem.yaml` and `iommu/pkvm,pviommu.yaml` reported parse
+errors and were skipped by the validator.
+
+## Board implementation notes
+
+Read-only hardware captures confirm Atoll-AB / SoC ID 443, project 19721,
+board ID `<34 0>` and selected DTBO index 0. Both the running 4.14 config
+and its decompressed Image header indicate 4 KiB kernel pages. The captured
+boot image uses header v2, 4 KiB packing pages, a 64 MiB boot partition and
+a separate 24 MiB DTBO partition. Shipping API level 29 is unchanged.
+
+The old ARM64 Image text offset is `0x80000`; the 6.12 header specifies
+zero. This is separate from boot-image header address fields. Bootloader
+hardcoding and actual load-address behavior remain unverified; no offset
+workaround is implemented.
+
+The reserved-memory map preserves every captured fixed region and its
+`no-map` coverage. The removal/modem overlap is split at `0x86000000` and
+duplicate display reservations are merged. Inherited XBL/AOP/command DB
+reservations conservatively retain an extra 1 MiB at `0x80600000`; command
+DB placement still needs confirmation. The vendor log region is reserved
+without enabling its custom ramoops layout. Unused dynamic pools and their
+consumers remain pending. No captured RAM capacity or unique identifiers
+are hardcoded into the board source.
+
+The six modeled rails use the vendor consumers' operating requests:
+
+| Rail | Constraint (microvolts) | Consumers |
 | --- | --- | --- |
-| Disable the broken SHM bridge path on SM7125 | Vitalii Skorkin | [`e2467151dcab02a7b134eac32b74fb8267bc2a24`](https://github.com/torvalds/linux/commit/e2467151dcab02a7b134eac32b74fb8267bc2a24) |
+| PM6150 L4 | 880000–900000 | UFS and USB PHY digital supply |
+| PM6150 L11 | 1800000 | USB PHY PLL |
+| PM6150 L12 | 1750000–1950000 | UFS VCCQ2 |
+| PM6150 L17 | 3075000–3200000 | USB DP/DM analog supply |
+| PM6150 L19 | 2960000 | UFS VCC |
+| PM6150L L3 | 1200000 | UFS PHY PLL/shared reference rail |
 
-That backport adds only the SM7125 blacklist entry. Its context was adjusted
-because this ACK base lacks the adjacent SM7150 entry. Its original author,
-author date, sign-offs, review/acknowledgment tags and source link are kept.
+These are configuration constraints, not measured voltages. The attempted
+regulator-summary debugfs path was unavailable on the running phone.
+
+USB currently supports only the source configuration for high-speed
+peripheral mode. SuperSpeed, Type-C role switching and VBUS sourcing remain
+disabled. Existing bindings express the vendor PHY tuning; the HSTX eFuse
+cell is retained with a zero trim fallback matching the vendor driver's
+valid-zero handling. PHY calibration still needs hardware validation.
+USB wiring does not provide charger, battery or fast-charge support.
+
+## Custom ROM integration requirements
+
+The available vendor tree contains 42 prebuilt modules with vermagic
+`4.14.180-perf+ SMP preempt mod_unload modversions aarch64`. These cannot be
+loaded into 6.12; required modules need compatible source and rebuilding.
+Firmware blobs and userspace libraries require separate assessment.
+
+Audit the target ROM's ION, KGSL/graphics, display/HWC, camera/video,
+audio/DSP RPC and secure-service contracts. Existing vendor binaries must
+not be assumed compatible with upstream interfaces. Enabling ICE/crypto
+at build time does not establish compatibility with existing encryption
+keys or userdata.
+
+Before any release, validate boot/recovery, storage and encryption, USB,
+display/touch, GPU/video, radio/connectivity, audio, cameras, sensors,
+biometrics, suspend, thermals and charging. ROM-specific init, fstab,
+module installation, VINTF and SELinux changes should remain separately
+reviewable from reusable kernel device support.
+
+## Provenance and contributions
+
+The SM7125 SHM-bridge prerequisite is a context-only backport of
+[Vitalii Skorkin's upstream change](https://github.com/torvalds/linux/commit/e2467151dcab02a7b134eac32b74fb8267bc2a24).
+Its author/date and original sign-off, review and acknowledgment trailers
+are preserved. The local adaptation only adjusts missing neighboring context.
 
 Realme board data is adapted from the Linux Foundation's 2019–2020 vendor
-descriptions in `arch/arm64/boot/dts/19721/{atoll.dtsi,atoll-ab-idp-overlay.dts}`
-of the local ShadowBladeX tree at commit
-`7306b28fccd87db72f25b314105747b1ce6f653c`, checked against a running RMX2061.
-The new board DTS retains those copyright notices and GPL-2.0-only license.
+sources in the local ShadowBladeX snapshot
+`7306b28fccd87db72f25b314105747b1ce6f653c`, under
+`arch/arm64/boot/dts/19721/`: `atoll.dtsi`, `atoll-ab-idp-overlay.dts`,
+`atoll-idp.dtsi`, `atoll-regulator.dtsi`, `atoll-usb.dtsi` and
+`atoll-pinctrl.dtsi`. Voltage requests and fuse handling were cross-checked
+against that snapshot's `drivers/phy/qualcomm/phy-qcom-ufs.c` and
+`drivers/usb/phy/phy-msm-qusb-v2.c`. The board retains the original notices
+and GPL-2.0-only license; current upstream drivers and PMIC descriptions
+retain their own licenses.
 
-## Build checks
+Preserve authorship, copyright, source revision references and existing
+sign-off chains when importing changes. Record adaptations separately;
+contributors must personally certify any DCO sign-off they supply. Update
+the port-status table with the checks performed and hardware results.
 
-The first checks used Linux ARM64 and Ubuntu Clang/LLD 18.1.3, with the
-kernel's ARM64 `defconfig`. These are bootstrap checks, not a production
-GKI build. The checked paths were the TrustZone allocator's SHM bridge mode
-and the two existing Xiaomi SM7125 reference DTBs.
-
-On Linux, with LLVM, GNU make, GCC host tools, flex, bison, bc, OpenSSL and
-ELF development headers installed, run from this source directory:
-
-```sh
-make O=/path/to/out ARCH=arm64 LLVM=1 defconfig
-make O=/path/to/out ARCH=arm64 LLVM=1 -j4 \
-    drivers/firmware/qcom/qcom_tzmem.o \
-    qcom/sm7125-xiaomi-curtana.dtb \
-    qcom/sm7125-xiaomi-joyeuse.dtb
-```
-
-The initial Realme board can be compiled in the same configured output:
-
-```sh
-make O=/path/to/out ARCH=arm64 LLVM=1 qcom/sm7125-realme-rmx2061.dtb
-```
-
-Confirm `CONFIG_QCOM_TZMEM_MODE_SHMBRIDGE=y` in the output `.config` when
-checking the imported fix. Keep outputs on a Linux filesystem with enough
-storage, outside the source checkout. The ACK release's toolchain constants
-are Clang `r536225` and Rust `1.82.0.p2` in `build.config.constants`; a full
-GKI build with those matching dependencies remains to be done.
-
-As of 2026-11-07, the original and patched sources both passed the targeted
-Linux compilation checks. A local harness exercising the actual allocator
-initializer reproduced an unwanted firmware call on SM7125 before the fix;
-afterward all five cases passed: SM7125 bypass, existing SC7180 bypass,
-supported-platform enable, unsupported firmware fallback and firmware error
-propagation. This harness replaces OF matching and the firmware call; it
-does not validate TrustZone on physical hardware.
-
-New scratch Python checks, logs and downloaded patches belong under
-`.port-local/`, excluded locally through `.git/info/exclude`. Do not remove
-or globally ignore upstream Python tools/tests.
-
-## Initial Realme board and live evidence
-
-Read-only captures on 2026-11-07 identify the connected RMX2061 as Atoll-AB
-(SoC ID 443), project 19721, board ID `<34 0>`, DTBO index 0. It runs
-Evolution X 17.0 / Android 17 with Astra 4.14.357. Its panel command-line
-selection is `dsi_nt36672c_jdi_video_display`; this does not establish a
-working 6.12 panel or touch driver.
-
-The captured boot header is v2, with 4 KiB packing pages, a 64 MiB boot
-partition and separate 24 MiB DTBO partition. The running kernel config
-and decompressed Image header independently confirm 4 KiB kernel pages.
-The old Image's text offset is `0x80000`; the 6.12 Image header specifies
-zero. Whether the bootloader hardcodes an offset remains unverified.
-Boot header address fields and the ARM64 Image text offset are distinct;
-no bootloader workaround or image packaging change is implemented yet.
-
-`sm7125-realme-rmx2061.dts` retains the measured Qualcomm selectors and
-`oppo,dtsi_no = <19721>`. It enables UART8 at `0xa88000`, GPIO44/45, through
-its QUP parent. It leaves RAM capacity for the bootloader to populate.
-Storage, USB, display, GPU, video and remote processors remain disabled,
-along with the unused graphics, video and camera clock controllers.
-
-The fixed reservation map preserves all captured regions and their
-`no-map` coverage. The overlapping vendor removal/modem reservations are
-split at `0x86000000`, preserving their union. Duplicate splash/display
-dump reservations become one region. The inherited SC7180 XBL/AOP/command
-DB reservations are retained conservatively, reserving an extra 1 MiB at
-`0x80600000` compared with the live vendor map; command DB placement still
-needs independent confirmation. The vendor log region is reserved without
-enabling its unaudited custom ramoops layout. Unused dynamic pools are
-deferred with their consumers; the unrelated SC7180 RMTFS reservation is
-removed rather than borrowing a Xiaomi address.
-
-The Realme DTB compiled with the bootstrap Linux toolchain. A local check
-of the compiled artifact verifies boot selectors, UART wiring, complete
-fixed/no-map reservation coverage, absence of overlapping reservations,
-and disabled storage/USB/remote processors. Raw phone captures, unique
-identifiers and local Python checks remain excluded from Git.
-
-## Remaining device work
-
-Next are the pinned production toolchain/full Image build, vendor-interface
-feasibility audit, PMIC/regulator integration, UFS and USB, and boot-image
-DTB/DTBO packaging. The CNB platform manifest and firmware paths still need
-an integration audit. The product shipping API level remains 29.
-
-The available vendor tree contains 42 modules with vermagic
-`4.14.180-perf+ SMP preempt mod_unload modversions aarch64`. They cannot be
-reused as 6.12 kernel modules. The ION, KGSL, HWC, camera, audio/DSP and
-security interfaces also need an explicit compatibility audit and port.
-
-No boot, encryption, graphics, camera, radio, suspend, thermal or charging
-acceptance test has passed. The debug UART has not been validated on hardware.
+Raw hardware captures and local development checks stay outside tracked
+source under locally excluded `.port-local/`. Existing upstream Python
+sources and tests remain intact.
