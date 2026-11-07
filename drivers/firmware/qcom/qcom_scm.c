@@ -1256,6 +1256,13 @@ int qcom_scm_ice_set_key(u32 index, const u8 *key, u32 key_size,
 }
 EXPORT_SYMBOL_GPL(qcom_scm_ice_set_key);
 
+bool qcom_scm_has_legacy_wrapped_key_support(void)
+{
+	return __qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_ES,
+					  QCOM_SCM_ES_DERIVE_SW_SECRET);
+}
+EXPORT_SYMBOL_GPL(qcom_scm_has_legacy_wrapped_key_support);
+
 /**
  * qcom_scm_derive_sw_secret() - Derive software secret from wrapped key
  * @eph_key: an ephemerally-wrapped key
@@ -1284,11 +1291,15 @@ int qcom_scm_derive_sw_secret(const u8 *eph_key, size_t eph_key_size,
 	};
 	int ret;
 
+	memzero_explicit(sw_secret, sw_secret_size);
+
 	void *eph_key_buf __free(qcom_tzmem) = qcom_tzmem_alloc(__scm->mempool,
 								eph_key_size,
 								GFP_KERNEL);
 	if (!eph_key_buf)
 		return -ENOMEM;
+
+	memset(eph_key_buf, 0, eph_key_size);
 
 	void *sw_secret_buf __free(qcom_tzmem) = qcom_tzmem_alloc(__scm->mempool,
 								  sw_secret_size,
@@ -1297,6 +1308,7 @@ int qcom_scm_derive_sw_secret(const u8 *eph_key, size_t eph_key_size,
 		return -ENOMEM;
 
 	memcpy(eph_key_buf, eph_key, eph_key_size);
+	memset(sw_secret_buf, 0, sw_secret_size);
 	desc.args[0] = qcom_tzmem_to_phys(eph_key_buf);
 	desc.args[1] = eph_key_size;
 	desc.args[2] = qcom_tzmem_to_phys(sw_secret_buf);

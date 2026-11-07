@@ -3,11 +3,13 @@
  * Qualcomm ICE (Inline Crypto Engine) support.
  *
  * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020, Linux Foundation. All rights reserved.
  * Copyright (c) 2019, Google LLC
  * Copyright (c) 2023, Linaro Limited
  */
 
 #include <linux/bitfield.h>
+#include <linux/blk-crypto.h>
 #include <linux/cleanup.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -48,6 +50,7 @@ struct qcom_ice {
 	struct device_link *link;
 
 	struct clk *core_clk;
+	bool legacy_wrapped_keys;
 };
 
 static bool qcom_ice_check_supported(struct qcom_ice *ice)
@@ -76,6 +79,9 @@ static bool qcom_ice_check_supported(struct qcom_ice *ice)
 		dev_warn(dev, "Fuses are blown; ICE is unusable!\n");
 		return false;
 	}
+
+	ice->legacy_wrapped_keys = major == 3 &&
+		qcom_scm_has_legacy_wrapped_key_support();
 
 	return true;
 }
@@ -200,6 +206,59 @@ int qcom_ice_program_key(struct qcom_ice *ice,
 	return err;
 }
 EXPORT_SYMBOL_GPL(qcom_ice_program_key);
+
+bool qcom_ice_has_legacy_wrapped_keys(struct qcom_ice *ice)
+{
+	return ice->legacy_wrapped_keys;
+}
+EXPORT_SYMBOL_GPL(qcom_ice_has_legacy_wrapped_keys);
+
+int qcom_ice_program_wrapped_key(struct qcom_ice *ice, const u8 *wrapped_key,
+				 size_t wrapped_key_size, u8 data_unit_size,
+				 int slot)
+{
+	int err;
+
+	if (!ice->legacy_wrapped_keys)
+		return -EOPNOTSUPP;
+	if (wrapped_key_size <= BLK_CRYPTO_SW_SECRET_SIZE ||
+	    wrapped_key_size > BLK_CRYPTO_MAX_HW_WRAPPED_KEY_SIZE)
+		return -EBADMSG;
+
+	/* Legacy firmware consumes wrapped blobs without the raw-key word swap. */
+	err = qcom_scm_ice_set_key(slot, wrapped_key, wrapped_key_size,
+				   QCOM_SCM_ICE_CIPHER_AES_256_XTS,
+				   data_unit_size);
+	return err;
+}
+EXPORT_SYMBOL_GPL(qcom_ice_program_wrapped_key);
+
+int qcom_ice_derive_sw_secret(struct qcom_ice *ice, const u8 *wrapped_key,
+			      size_t wrapped_key_size,
+			      u8 sw_secret[BLK_CRYPTO_SW_SECRET_SIZE])
+{
+	int err;
+
+	memzero_explicit(sw_secret, BLK_CRYPTO_SW_SECRET_SIZE);
+	if (!ice->legacy_wrapped_keys)
+		return -EOPNOTSUPP;
+	if (wrapped_key_size <= BLK_CRYPTO_SW_SECRET_SIZE ||
+	    wrapped_key_size > BLK_CRYPTO_MAX_HW_WRAPPED_KEY_SIZE)
+		return -EBADMSG;
+
+	/* Legacy short blobs carry the software secret in their prefix. */
+	if (wrapped_key_size <= AES_256_XTS_KEY_SIZE) {
+		memcpy(sw_secret, wrapped_key, BLK_CRYPTO_SW_SECRET_SIZE);
+		return 0;
+	}
+
+	err = qcom_scm_derive_sw_secret(wrapped_key, wrapped_key_size, sw_secret,
+					BLK_CRYPTO_SW_SECRET_SIZE);
+	if (err)
+		memzero_explicit(sw_secret, BLK_CRYPTO_SW_SECRET_SIZE);
+	return err;
+}
+EXPORT_SYMBOL_GPL(qcom_ice_derive_sw_secret);
 
 int qcom_ice_evict_key(struct qcom_ice *ice, int slot)
 {

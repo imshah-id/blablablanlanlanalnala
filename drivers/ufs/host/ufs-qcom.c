@@ -148,6 +148,9 @@ static int ufs_qcom_ice_init(struct ufs_qcom_host *host)
 
 	profile->ll_ops = ufs_qcom_crypto_ops;
 	profile->key_types_supported = BLK_CRYPTO_KEY_TYPE_STANDARD;
+	if (of_device_is_compatible(dev->of_node, "qcom,sm7125-ufshc") &&
+	    qcom_ice_has_legacy_wrapped_keys(ice))
+		profile->key_types_supported |= BLK_CRYPTO_KEY_TYPE_HW_WRAPPED;
 	profile->max_dun_bytes_supported = 8;
 	profile->dev = dev;
 
@@ -201,12 +204,23 @@ static int ufs_qcom_ice_keyslot_program(struct blk_crypto_profile *profile,
 		return -EOPNOTSUPP;
 
 	ufshcd_hold(hba);
-	err = qcom_ice_program_key(host->ice,
-				   QCOM_ICE_CRYPTO_ALG_AES_XTS,
-				   QCOM_ICE_CRYPTO_KEY_SIZE_256,
-				   key->raw,
-				   key->crypto_cfg.data_unit_size / 512,
-				   slot);
+	if (key->crypto_cfg.key_type == BLK_CRYPTO_KEY_TYPE_HW_WRAPPED &&
+	    profile->key_types_supported & BLK_CRYPTO_KEY_TYPE_HW_WRAPPED) {
+		err = qcom_ice_program_wrapped_key(host->ice, key->raw, key->size,
+						   key->crypto_cfg.data_unit_size / 512, slot);
+	} else if (key->crypto_cfg.key_type == BLK_CRYPTO_KEY_TYPE_STANDARD &&
+		   key->size == 64) {
+		err = qcom_ice_program_key(host->ice,
+					   QCOM_ICE_CRYPTO_ALG_AES_XTS,
+					   QCOM_ICE_CRYPTO_KEY_SIZE_256,
+					   key->raw,
+					   key->crypto_cfg.data_unit_size / 512,
+					   slot);
+	} else {
+		err = -EOPNOTSUPP;
+	}
+	if (err)
+		qcom_ice_evict_key(host->ice, slot);
 	ufshcd_release(hba);
 	return err;
 }
@@ -225,9 +239,29 @@ static int ufs_qcom_ice_keyslot_evict(struct blk_crypto_profile *profile,
 	return err;
 }
 
+static int ufs_qcom_ice_derive_sw_secret(struct blk_crypto_profile *profile,
+					 const u8 *eph_key, size_t eph_key_size,
+					 u8 sw_secret[BLK_CRYPTO_SW_SECRET_SIZE])
+{
+	struct ufs_hba *hba = container_of(profile, struct ufs_hba, crypto_profile);
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	int err;
+
+	if (!(profile->key_types_supported & BLK_CRYPTO_KEY_TYPE_HW_WRAPPED)) {
+		memzero_explicit(sw_secret, BLK_CRYPTO_SW_SECRET_SIZE);
+		return -EOPNOTSUPP;
+	}
+
+	ufshcd_hold(hba);
+	err = qcom_ice_derive_sw_secret(host->ice, eph_key, eph_key_size, sw_secret);
+	ufshcd_release(hba);
+	return err;
+}
+
 static const struct blk_crypto_ll_ops ufs_qcom_crypto_ops = {
 	.keyslot_program	= ufs_qcom_ice_keyslot_program,
 	.keyslot_evict		= ufs_qcom_ice_keyslot_evict,
+	.derive_sw_secret	= ufs_qcom_ice_derive_sw_secret,
 };
 
 #else

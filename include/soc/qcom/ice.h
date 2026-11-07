@@ -7,6 +7,7 @@
 #define __QCOM_ICE_H__
 
 #include <linux/types.h>
+#include <linux/blk-crypto.h>
 
 struct qcom_ice;
 
@@ -33,6 +34,13 @@ int qcom_ice_program_key(struct qcom_ice *ice,
 			 const u8 crypto_key[], u8 data_unit_size,
 			 int slot);
 int qcom_ice_evict_key(struct qcom_ice *ice, int slot);
+bool qcom_ice_has_legacy_wrapped_keys(struct qcom_ice *ice);
+int qcom_ice_program_wrapped_key(struct qcom_ice *ice, const u8 *wrapped_key,
+				 size_t wrapped_key_size, u8 data_unit_size,
+				 int slot);
+int qcom_ice_derive_sw_secret(struct qcom_ice *ice, const u8 *wrapped_key,
+			      size_t wrapped_key_size,
+			      u8 sw_secret[BLK_CRYPTO_SW_SECRET_SIZE]);
 struct qcom_ice *of_qcom_ice_get(struct device *dev);
 struct qcom_ice *devm_of_qcom_ice_get(struct device *dev);
 
