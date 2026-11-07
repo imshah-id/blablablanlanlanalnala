@@ -1,0 +1,158 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/arm/qcom,ids.h>
+#include "sm7125.dtsi"
+
+/delete-node/ &ipa_fw_mem;
+/delete-node/ &rmtfs_mem;
+
+/ {
+	model = "Realme 6 Pro (RMX2061)";
+	compatible = "realme,rmx2061", "qcom,sm7125";
+	chassis-type = "handset";
+
+	/* Retain the Atoll-AB selectors used by the shipping bootloader. */
+	oppo,dtsi_no = <19721>;
+	qcom,msm-id = <QCOM_ID_SM7125 0>;
+	qcom,board-id = <34 0>;
+
+	aliases {
+		serial0 = &uart8;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	reserved-memory {
+		mpss_mem: memory@86000000 {
+			reg = <0x0 0x86000000 0x0 0x8400000>;
+			no-map;
+		};
+
+		camera_mem: memory@8e400000 {
+			reg = <0x0 0x8e400000 0x0 0x500000>;
+			no-map;
+		};
+
+		npu_mem: memory@8e900000 {
+			reg = <0x0 0x8e900000 0x0 0x500000>;
+			no-map;
+		};
+
+		venus_mem: memory@8ee00000 {
+			reg = <0x0 0x8ee00000 0x0 0x500000>;
+			no-map;
+		};
+
+		cdsp_mem: memory@8f300000 {
+			reg = <0x0 0x8f300000 0x0 0x1e00000>;
+			no-map;
+		};
+
+		adsp_mem: memory@91100000 {
+			reg = <0x0 0x91100000 0x0 0x2800000>;
+			no-map;
+		};
+
+		wlan_mem: memory@93900000 {
+			reg = <0x0 0x93900000 0x0 0x200000>;
+			no-map;
+		};
+
+		ipa_fw_mem: memory@93b00000 {
+			reg = <0x0 0x93b00000 0x0 0x10000>;
+			no-map;
+		};
+
+		ipa_gsi_mem: memory@93b10000 {
+			reg = <0x0 0x93b10000 0x0 0x5000>;
+			no-map;
+		};
+
+		gpu_mem: memory@93b15000 {
+			reg = <0x0 0x93b15000 0x0 0x2000>;
+			no-map;
+		};
+
+		/* The vendor splash and display dump describe the same region. */
+		cont_splash_mem: memory@9c000000 {
+			reg = <0x0 0x9c000000 0x0 0x1700000>;
+		};
+
+		dfps_mem: memory@9d700000 {
+			reg = <0x0 0x9d700000 0x0 0x100000>;
+		};
+
+		qseecom_mem: memory@9e000000 {
+			reg = <0x0 0x9e000000 0x0 0x1400000>;
+			no-map;
+		};
+
+		cdsp_sec_mem: memory@9f400000 {
+			reg = <0x0 0x9f400000 0x0 0x1e00000>;
+			no-map;
+		};
+
+		/* Reserve the vendor log area until its custom layout is ported. */
+		pstore_mem: memory@b7e00000 {
+			reg = <0x0 0xb7e00000 0x0 0x400000>;
+		};
+	};
+};
+
+&camcc {
+	status = "disabled";
+};
+
+&dispcc {
+	status = "disabled";
+};
+
+&gmu {
+	status = "disabled";
+};
+
+&gpu {
+	status = "disabled";
+};
+
+&gpucc {
+	status = "disabled";
+};
+
+&qupv3_id_1 {
+	status = "okay";
+};
+
+&qup_uart8_rx {
+	drive-strength = <2>;
+	bias-disable;
+};
+
+&qup_uart8_tx {
+	drive-strength = <2>;
+	bias-disable;
+};
+
+&tz_mem {
+	/* Split the vendor's overlapping removal/modem ranges at 0x86000000. */
+	reg = <0x0 0x80b00000 0x0 0x5500000>;
+};
+
+&uart8 {
+	status = "okay";
+};
+
+&venus {
+	status = "disabled";
+};
+
+&videocc {
+	status = "disabled";
+};

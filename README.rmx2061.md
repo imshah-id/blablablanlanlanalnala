@@ -1,8 +1,9 @@
 # Realme 6 Pro / RMX2061 — Android 6.12 port
 
-Experimental source work for Evolution X CNB. There is no RMX2061 bootable
-image or validated Realme board DTS yet. The existing Xiaomi reference
-DTBs are build checks only and must not be flashed to RMX2061.
+Experimental source work for Evolution X CNB. The initial RMX2061 board
+DTS covers identification, fixed reserved memory and the debug UART. It
+has not been boot-tested; there is no bootable RMX2061 image yet. The
+existing Xiaomi reference DTBs must not be flashed to RMX2061.
 
 ## Source and authorship
 
@@ -32,6 +33,12 @@ That backport adds only the SM7125 blacklist entry. Its context was adjusted
 because this ACK base lacks the adjacent SM7150 entry. Its original author,
 author date, sign-offs, review/acknowledgment tags and source link are kept.
 
+Realme board data is adapted from the Linux Foundation's 2019–2020 vendor
+descriptions in `arch/arm64/boot/dts/19721/{atoll.dtsi,atoll-ab-idp-overlay.dts}`
+of the local ShadowBladeX tree at commit
+`7306b28fccd87db72f25b314105747b1ce6f653c`, checked against a running RMX2061.
+The new board DTS retains those copyright notices and GPL-2.0-only license.
+
 ## Build checks
 
 The first checks used Linux ARM64 and Ubuntu Clang/LLD 18.1.3, with the
@@ -48,6 +55,12 @@ make O=/path/to/out ARCH=arm64 LLVM=1 -j4 \
     drivers/firmware/qcom/qcom_tzmem.o \
     qcom/sm7125-xiaomi-curtana.dtb \
     qcom/sm7125-xiaomi-joyeuse.dtb
+```
+
+The initial Realme board can be compiled in the same configured output:
+
+```sh
+make O=/path/to/out ARCH=arm64 LLVM=1 qcom/sm7125-realme-rmx2061.dtb
 ```
 
 Confirm `CONFIG_QCOM_TZMEM_MODE_SHMBRIDGE=y` in the output `.config` when
@@ -68,18 +81,56 @@ New scratch Python checks, logs and downloaded patches belong under
 `.port-local/`, excluded locally through `.git/info/exclude`. Do not remove
 or globally ignore upstream Python tools/tests.
 
+## Initial Realme board and live evidence
+
+Read-only captures on 2026-11-07 identify the connected RMX2061 as Atoll-AB
+(SoC ID 443), project 19721, board ID `<34 0>`, DTBO index 0. It runs
+Evolution X 17.0 / Android 17 with Astra 4.14.357. Its panel command-line
+selection is `dsi_nt36672c_jdi_video_display`; this does not establish a
+working 6.12 panel or touch driver.
+
+The captured boot header is v2, with 4 KiB packing pages, a 64 MiB boot
+partition and separate 24 MiB DTBO partition. The running kernel config
+and decompressed Image header independently confirm 4 KiB kernel pages.
+The old Image's text offset is `0x80000`; the 6.12 Image header specifies
+zero. Whether the bootloader hardcodes an offset remains unverified.
+Boot header address fields and the ARM64 Image text offset are distinct;
+no bootloader workaround or image packaging change is implemented yet.
+
+`sm7125-realme-rmx2061.dts` retains the measured Qualcomm selectors and
+`oppo,dtsi_no = <19721>`. It enables UART8 at `0xa88000`, GPIO44/45, through
+its QUP parent. It leaves RAM capacity for the bootloader to populate.
+Storage, USB, display, GPU, video and remote processors remain disabled,
+along with the unused graphics, video and camera clock controllers.
+
+The fixed reservation map preserves all captured regions and their
+`no-map` coverage. The overlapping vendor removal/modem reservations are
+split at `0x86000000`, preserving their union. Duplicate splash/display
+dump reservations become one region. The inherited SC7180 XBL/AOP/command
+DB reservations are retained conservatively, reserving an extra 1 MiB at
+`0x80600000` compared with the live vendor map; command DB placement still
+needs independent confirmation. The vendor log region is reserved without
+enabling its unaudited custom ramoops layout. Unused dynamic pools are
+deferred with their consumers; the unrelated SC7180 RMTFS reservation is
+removed rather than borrowing a Xiaomi address.
+
+The Realme DTB compiled with the bootstrap Linux toolchain. A local check
+of the compiled artifact verifies boot selectors, UART wiring, complete
+fixed/no-map reservation coverage, absence of overlapping reservations,
+and disabled storage/USB/remote processors. Raw phone captures, unique
+identifiers and local Python checks remain excluded from Git.
+
 ## Remaining device work
 
-The local CNB device configuration uses boot header v2, a 64 MiB boot
-partition, separate 24 MiB DTBO, and shipping API level 29. These are source
-settings, not live-device measurements. The installed phone's boot/DTBO
-selection, reserved memory, panel/touch variant, firmware and CNB platform
-manifest still need to be captured before finalizing the Realme board DTS.
+Next are the pinned production toolchain/full Image build, vendor-interface
+feasibility audit, PMIC/regulator integration, UFS and USB, and boot-image
+DTB/DTBO packaging. The CNB platform manifest and firmware paths still need
+an integration audit. The product shipping API level remains 29.
 
 The available vendor tree contains 42 modules with vermagic
 `4.14.180-perf+ SMP preempt mod_unload modversions aarch64`. They cannot be
 reused as 6.12 kernel modules. The ION, KGSL, HWC, camera, audio/DSP and
 security interfaces also need an explicit compatibility audit and port.
 
-No phone was attached during this stage. No boot, encryption, graphics,
-camera, radio, suspend, thermal or charging acceptance test has passed.
+No boot, encryption, graphics, camera, radio, suspend, thermal or charging
+acceptance test has passed. The debug UART has not been validated on hardware.
