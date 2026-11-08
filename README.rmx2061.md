@@ -51,6 +51,59 @@ SM7125 DTBs are reference build targets and are unsuitable for RMX2061.
 
 ## Build and validation
 
+### Ubuntu/Debian x86_64 VM
+
+Copy this updated checkout to the VM, then run from the kernel directory:
+
+```sh
+./build.sh --install-deps
+```
+
+The first run installs host packages using sudo when needed and downloads the
+pinned Android Clang r536225, Rust 1.82.0.p2 and bindgen 0.69.5. By default it
+uses all available CPUs (`nproc`). Use `JOBS=8 ./build.sh` to override parallelism
+if needed. Later builds use `./build.sh`; output is
+incremental in `out/` and tool downloads are cached in `.build-tools/`.
+`./build.sh --configure-only` checks the tools and resolves the board configuration
+without compiling the kernel. The board fragment is reapplied on each run;
+make persistent config changes in `arch/arm64/configs/rmx2061.config`.
+
+Each successful build creates its own directory under `dist/` containing
+Image, Image.gz, Image.gz-dtb, the board DTB, DTBO image, resolved config,
+modules.tar.gz, full logs, source revision/change records and SHA256SUMS.
+It also creates `RMX2061-<release>-bringup.zip` using the same
+[theshaenix/AnyKernel3](https://github.com/theshaenix/AnyKernel3) fork as
+ShadowBladeX, pinned to `f1d4fc3dc76eec5b9385eaa8ea617c89b429a539`.
+`ANYKERNEL_DIR` can point to an existing clean checkout of that revision.
+
+The generated installer keeps that fork's core/tools and A-only boot path,
+restricts the device list to RMX2061 aliases, and removes the unrelated Galaxy
+Nexus ramdisk example edits. It preserves the installed Android ramdisk, replaces
+both DTB copies and DTBO, and verifies flash readback. Kernel modules remain in a
+separate archive, not automatically installed into the existing ROM. It does not
+add KernelSU or promise to retain root. Temporary pre-install images remain in
+recovery's `/tmp/anykernel`; save durable boot/DTBO backups before flashing.
+On a detected installer failure it attempts restoration, but this cannot protect
+against power loss or establish that the new kernel boots.
+
+After success, only the flashable ZIP is automatically uploaded to GoFile,
+following the API flow in the requested
+[GoFile-Upload helper](https://github.com/Sushrut1101/GoFile-Upload/blob/master/upload.sh).
+The link is printed and saved in `gofile-link.txt`. Set `GOFILE_UPLOAD=0` to build
+without uploading. An upload failure returns exit code 2 and retains all local
+artifacts; retry without rebuilding:
+
+```sh
+bash scripts/upload-gofile.sh dist/<build-directory>/RMX2061-<release>-bringup.zip
+```
+
+These are **experimental bring-up ZIPs**, not daily-use releases. Packaging does
+not fix the unresolved early boot failure or missing device drivers. The script
+does not flash the phone. Run the offline helper tests with
+`python3 scripts/tests/test_rmx2061_build.py` (requires jq).
+
+### Manual build
+
 Use Linux with LLVM/LLD, GNU make, GCC host tools, flex, bison, bc, OpenSSL
 and ELF development headers. Keep output on a Linux filesystem outside the
 source checkout.
