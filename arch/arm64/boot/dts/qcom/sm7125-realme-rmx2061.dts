@@ -7,6 +7,7 @@
 
 #include <dt-bindings/arm/qcom,ids.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/phy/phy-qcom-qusb2.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
 #include "sm7125.dtsi"
@@ -33,6 +34,20 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&volume_down_default>;
+
+		key-volume-down {
+			label = "Volume Down";
+			linux,code = <KEY_VOLUMEDOWN>;
+			gpios = <&tlmm 117 GPIO_ACTIVE_LOW>;
+			debounce-interval = <15>;
+			wakeup-source;
+		};
 	};
 
 	reserved-memory {
@@ -197,6 +212,16 @@
 	status = "disabled";
 };
 
+&pm6150_resin {
+	/* Realme routes Volume Up to RESIN, rather than Volume Down. */
+	linux,code = <KEY_VOLUMEUP>;
+	status = "okay";
+};
+
+&pm6150_rtc {
+	status = "okay";
+};
+
 &qupv3_id_1 {
 	status = "okay";
 };
@@ -212,6 +237,13 @@
 };
 
 &tlmm {
+	volume_down_default: volume-down-state {
+		pins = "gpio117";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
 	ufs_reset_default: ufs-reset-default-state {
 		pins = "ufs_reset";
 		bias-pull-down;
